@@ -3,3 +3,6 @@
 bin/
 dist/
 log
+.DS_Store
+src/.DS_Store
+src/java/.DS_Store
