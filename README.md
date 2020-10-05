@@ -13,3 +13,5 @@ Lab Submission
 
 Instructions for labs (including how to submit answers) are [here](https://github.com/MIT-DB-Class/course-info-2018)
 
+This is powered by huixiong.
+
