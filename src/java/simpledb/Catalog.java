@@ -17,13 +17,25 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Threadsafe
  */
 public class Catalog {
+    private static final Integer CATALOG_LOCK = -1;
 
     /**
      * Constructor.
      * Creates a new, empty catalog.
      */
+    private Map<Integer, DbFile> TableID_DbFile;
+    private Map<Integer, String> TableID_PrimaryKey;
+    private Map<Integer, String> TableID_TableName;
+    private Map<String, Integer> TableName_TableID;
+
     public Catalog() {
         // some code goes here
+        synchronized (CATALOG_LOCK){
+            TableID_DbFile = new ConcurrentHashMap<>();
+            TableID_PrimaryKey = new ConcurrentHashMap<>();
+            TableID_TableName = new ConcurrentHashMap<>();
+            TableName_TableID = new ConcurrentHashMap<>();
+        }
     }
 
     /**
@@ -37,6 +49,15 @@ public class Catalog {
      */
     public void addTable(DbFile file, String name, String pkeyField) {
         // some code goes here
+        synchronized (CATALOG_LOCK){
+            Integer tableID = file.getId();
+            TableID_DbFile.put(tableID, file);
+            TableID_PrimaryKey.put(tableID, pkeyField);
+            TableID_TableName.put(tableID, name);
+            TableName_TableID.put(name, tableID);
+        }
+
+
     }
 
     public void addTable(DbFile file, String name) {
@@ -60,49 +81,68 @@ public class Catalog {
      */
     public int getTableId(String name) throws NoSuchElementException {
         // some code goes here
-        return 0;
+        try{
+            return TableName_TableID.get(name);
+        } catch (RuntimeException e){
+            throw new NoSuchElementException("There doesn't exist a table named " + name);
+        }
     }
 
     /**
      * Returns the tuple descriptor (schema) of the specified table
-     * @param tableid The id of the table, as specified by the DbFile.getId()
+     * @param tableID The id of the table, as specified by the DbFile.getId()
      *     function passed to addTable
      * @throws NoSuchElementException if the table doesn't exist
      */
-    public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
+    public TupleDesc getTupleDesc(int tableID) throws NoSuchElementException {
         // some code goes here
-        return null;
+        try{
+            DbFile file = TableID_DbFile.get(tableID);
+            return file.getTupleDesc();
+        } catch (RuntimeException e){
+            throw new NoSuchElementException("The table doesn't exist");
+        }
     }
 
     /**
      * Returns the DbFile that can be used to read the contents of the
      * specified table.
-     * @param tableid The id of the table, as specified by the DbFile.getId()
+     * @param tableID The id of the table, as specified by the DbFile.getId()
      *     function passed to addTable
      */
-    public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
+    public DbFile getDatabaseFile(int tableID) throws NoSuchElementException {
         // some code goes here
-        return null;
+        try{
+            return TableID_DbFile.get(tableID);
+        } catch (RuntimeException e){
+            throw new NoSuchElementException("The database file doesn't exist");
+        }
     }
 
-    public String getPrimaryKey(int tableid) {
+    public String getPrimaryKey(int tableID) {
         // some code goes here
-        return null;
+        return TableID_PrimaryKey.get(tableID);
     }
 
     public Iterator<Integer> tableIdIterator() {
         // some code goes here
-        return null;
+        return TableID_PrimaryKey.keySet().iterator();
     }
 
     public String getTableName(int id) {
         // some code goes here
-        return null;
+        return TableID_TableName.get(id);
     }
     
     /** Delete all tables from the catalog */
     public void clear() {
         // some code goes here
+        synchronized (CATALOG_LOCK){
+            TableID_TableName.clear();
+            TableID_PrimaryKey.clear();
+            TableID_DbFile.clear();
+            TableName_TableID.clear();
+        }
     }
     
     /**
