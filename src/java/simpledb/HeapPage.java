@@ -67,7 +67,7 @@ public class HeapPage implements Page {
     */
     private int getNumTuples() {        
         // some code goes here
-        return 0;
+        return BufferPool.getPageSize()*8/(td.getSize()*8+1);
 
     }
 
@@ -78,8 +78,9 @@ public class HeapPage implements Page {
     private int getHeaderSize() {        
         
         // some code goes here
-        return 0;
-                 
+        int ans = numSlots/8;
+        if(ans*8 < numSlots) return ans+1;
+        return ans;
     }
     
     /** Return a view of this page before it was modified
@@ -112,7 +113,8 @@ public class HeapPage implements Page {
      */
     public HeapPageId getId() {
     // some code goes here
-    throw new UnsupportedOperationException("implement this");
+    // throw new UnsupportedOperationException("implement this");
+        return pid;
     }
 
     /**
@@ -282,7 +284,11 @@ public class HeapPage implements Page {
      */
     public int getNumEmptySlots() {
         // some code goes here
-        return 0;
+        int ans = 0;
+        for(int i=0; i<tuples.length; i++){
+            if(!isSlotUsed(i)) ans++;
+        }
+        return ans;
     }
 
     /**
@@ -290,7 +296,7 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         // some code goes here
-        return false;
+        return (header[i / 8] & (1 << (i % 8))) != 0;
     }
 
     /**
@@ -307,7 +313,20 @@ public class HeapPage implements Page {
      */
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return null;
+        return new Iterator<Tuple>() {
+            int cur = 0;
+            @Override
+            public boolean hasNext() {
+                while(cur<tuples.length && !isSlotUsed(cur)) cur++;
+                return cur < tuples.length;
+            }
+
+            @Override
+            public Tuple next() {
+                if(hasNext()) return tuples[cur++];
+                return null;
+            }
+        };
     }
 
 }
