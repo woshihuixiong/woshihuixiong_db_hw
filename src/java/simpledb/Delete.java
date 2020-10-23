@@ -71,12 +71,14 @@ public class Delete extends Operator {
         if(hasFetched) return null;
         hasFetched = true;
         int count = 0;
-        try{
-            Database.getBufferPool().deleteTuple(tid, child.next());
-        }catch(IOException e){
-            e.printStackTrace();
+        while(child.hasNext()){
+            try{
+                Database.getBufferPool().deleteTuple(tid, child.next());
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+            count++;
         }
-        count++;
         res.setField(0,new IntField(count));
         return res;
     }

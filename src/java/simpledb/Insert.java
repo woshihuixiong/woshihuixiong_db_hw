@@ -85,17 +85,16 @@ public class Insert extends Operator {
         // some code goes here
         if(hasFetched) return null;
         hasFetched = true;
-        int ans = 0;
-        open();
+        int count = 0;
         while (child.hasNext()){
             try{
                 Database.getBufferPool().insertTuple(tid, tableID, child.next());
             }catch (IOException e){
                 e.printStackTrace();
             }
-            ans++;
+            count++;
         }
-        res.setField(0, new IntField(ans));
+        res.setField(0, new IntField(count));
         return res;
     }
 

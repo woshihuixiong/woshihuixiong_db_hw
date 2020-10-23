@@ -3,6 +3,7 @@ package simpledb;
 import java.io.*;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -188,7 +189,9 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for(PageId pageId: PageID_Page.keySet()){
+            flushPage(pageId);
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -202,6 +205,8 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        if(pid == null) return;
+        PageID_Page.remove(pid);
     }
 
     /**
@@ -211,6 +216,11 @@ public class BufferPool {
     private synchronized  void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        Page page = PageID_Page.getOrDefault(pid, null);
+        if(page != null && page.isDirty() != null){
+            Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(page);
+            page.markDirty(false, null);
+        }
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -227,6 +237,18 @@ public class BufferPool {
     private synchronized  void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        if(PageID_Page.size() == 0) throw new DbException("no page to evict");
+        for(PageId pageId: PageID_Page.keySet()){
+            if(PageID_Page.get(pageId).isDirty() != null){
+                try{
+                    flushPage(pageId);
+                }catch (IOException e){
+                    e.printStackTrace();
+                }
+            }
+            discardPage(pageId);
+            return;
+        }
     }
 
 }
