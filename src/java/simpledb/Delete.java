@@ -9,6 +9,11 @@ import java.io.IOException;
 public class Delete extends Operator {
 
     private static final long serialVersionUID = 1L;
+    TransactionId tid;
+    OpIterator child;
+    OpIterator[] children;
+    Tuple res;
+    boolean hasFetched;
 
     /**
      * Constructor specifying the transaction that this delete belongs to as
@@ -21,23 +26,35 @@ public class Delete extends Operator {
      */
     public Delete(TransactionId t, OpIterator child) {
         // some code goes here
+        this.tid = t;
+        this.child = child;
+        this.children = new OpIterator[]{child};
+        res = new Tuple(new TupleDesc(new Type[]{Type.INT_TYPE}));
+        hasFetched = false;
     }
 
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        return child.getTupleDesc();
     }
 
     public void open() throws DbException, TransactionAbortedException {
         // some code goes here
+        super.open();
+        child.open();
+        hasFetched = false;
     }
 
     public void close() {
         // some code goes here
+        child.close();
+        super.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
+        close();
+        open();
     }
 
     /**
@@ -51,18 +68,29 @@ public class Delete extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+        if(hasFetched) return null;
+        hasFetched = true;
+        int count = 0;
+        try{
+            Database.getBufferPool().deleteTuple(tid, child.next());
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+        count++;
+        res.setField(0,new IntField(count));
+        return res;
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return null;
+        return children;
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+        this.children = children;
     }
 
 }

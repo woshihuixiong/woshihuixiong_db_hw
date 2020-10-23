@@ -1,5 +1,9 @@
 package simpledb;
 
+import net.sf.antcontrib.logic.condition.IsPropertyFalse;
+
+import java.io.IOException;
+
 /**
  * Inserts tuples read from the child operator into the tableId specified in the
  * constructor
@@ -7,6 +11,12 @@ package simpledb;
 public class Insert extends Operator {
 
     private static final long serialVersionUID = 1L;
+    TransactionId tid;
+    int tableID;
+    OpIterator child;
+    OpIterator[] children;
+    Tuple res;
+    boolean hasFetched;
 
     /**
      * Constructor.
@@ -22,25 +32,40 @@ public class Insert extends Operator {
      *             insert.
      */
     public Insert(TransactionId t, OpIterator child, int tableId)
-            throws DbException {
+            throws DbException, TransactionAbortedException {
         // some code goes here
+        this.tid = t;
+        this.tableID = tableId;
+        this.child = child;
+        hasFetched = false;
+        children = new OpIterator[]{child};
+        res = new Tuple(new TupleDesc(new Type[]{Type.INT_TYPE}));
+
+        //if(!tupleDesc.equals(dataBaseFile.getTupleDesc())) throw new DbException("TupleDesc of child differs from table into which we are to insert")
     }
 
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        return res.getTupleDesc();
     }
 
     public void open() throws DbException, TransactionAbortedException {
         // some code goes here
+        super.open();
+        child.open();
+        hasFetched = false;
     }
 
     public void close() {
         // some code goes here
+        child.close();
+        super.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
+        close();
+        open();
     }
 
     /**
@@ -58,17 +83,31 @@ public class Insert extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+        if(hasFetched) return null;
+        hasFetched = true;
+        int ans = 0;
+        open();
+        while (child.hasNext()){
+            try{
+                Database.getBufferPool().insertTuple(tid, tableID, child.next());
+            }catch (IOException e){
+                e.printStackTrace();
+            }
+            ans++;
+        }
+        res.setField(0, new IntField(ans));
+        return res;
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return null;
+        return children;
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+        this.children = children;
     }
 }
