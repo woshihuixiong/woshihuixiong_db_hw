@@ -1,5 +1,7 @@
 package simpledb;
 
+import java.util.Arrays;
+
 /** A class to represent a fixed-width histogram over a single integer-based field.
  */
 public class IntHistogram {
@@ -20,8 +22,20 @@ public class IntHistogram {
      * @param min The minimum integer value that will ever be passed to this class for histogramming
      * @param max The maximum integer value that will ever be passed to this class for histogramming
      */
+
+    int[] buckets;
+    int minInt;
+    int maxInt;
+    int width;
+    int countAll = 0;
+
+
     public IntHistogram(int buckets, int min, int max) {
     	// some code goes here
+        this.buckets = new int[buckets];
+        this.minInt = min;
+        this.maxInt = max;
+        width = (max - min + 1) / buckets;
     }
 
     /**
@@ -30,6 +44,13 @@ public class IntHistogram {
      */
     public void addValue(int v) {
     	// some code goes here
+        countAll++;
+        buckets[calculateBucketNum(v)]++;
+    }
+
+    private int calculateBucketNum(int v){
+        if(v >= minInt+width*(buckets.length-1)) return buckets.length-1;
+        return (v-minInt)/width;
     }
 
     /**
@@ -45,7 +66,59 @@ public class IntHistogram {
     public double estimateSelectivity(Predicate.Op op, int v) {
 
     	// some code goes here
-        return -1.0;
+        if(v < minInt){
+            switch (op){
+                case EQUALS:
+                case LESS_THAN:
+                case LESS_THAN_OR_EQ:
+                    return 0.0;
+                case NOT_EQUALS:
+                case GREATER_THAN:
+                case GREATER_THAN_OR_EQ:
+                    return 1.0;
+            }
+        }
+
+        if(v > maxInt){
+            switch (op){
+                case EQUALS:
+                case GREATER_THAN:
+                case GREATER_THAN_OR_EQ:
+                    return 0.0;
+                case NOT_EQUALS:
+                case LESS_THAN:
+                case LESS_THAN_OR_EQ:
+                    return 1.0;
+            }
+        }
+
+        int bucketNum = calculateBucketNum(v);
+        int bucketWidth = bucketNum == buckets.length-1 ? maxInt-minInt+1-width*(buckets.length-1) : width;
+
+        if(op == Predicate.Op.EQUALS){
+            return 1.0*buckets[bucketNum]/bucketWidth/countAll;
+        }
+        if(op == Predicate.Op.NOT_EQUALS){
+            return 1-1.0*buckets[bucketNum]/bucketWidth/countAll;
+        }
+
+        double countSmaller = 0;
+        double countLarger = 0;
+        for(int i=0; i<buckets.length; i++){
+            if(bucketNum != i) countSmaller+=buckets[i];
+            else break;
+        }
+        countSmaller += 1.0*buckets[bucketNum]*(v-width*bucketNum-minInt)/bucketWidth;
+        countLarger = countAll-countSmaller-1.0*buckets[bucketNum]/bucketWidth;
+
+        return switch (op) {
+            case LESS_THAN -> countSmaller / countAll;
+            case LESS_THAN_OR_EQ -> 1 - countLarger / countAll;
+            case GREATER_THAN -> countLarger / countAll;
+            case GREATER_THAN_OR_EQ -> 1 - countSmaller / countAll;
+            default -> 0.0;
+        };
+
     }
     
     /**
@@ -59,7 +132,11 @@ public class IntHistogram {
     public double avgSelectivity()
     {
         // some code goes here
-        return 1.0;
+        double ans = 0.0;
+        for(int buc: buckets){
+            ans += buc;
+        }
+        return ans / (maxInt - minInt +1);
     }
     
     /**
@@ -67,6 +144,11 @@ public class IntHistogram {
      */
     public String toString() {
         // some code goes here
-        return null;
+        return  "IntHistogram{ " +
+                "buckets = " + Arrays.toString(buckets) +
+                ", min = " + minInt +
+                ", max = " + maxInt +
+                ", width = " + width +
+                " }";
     }
 }
