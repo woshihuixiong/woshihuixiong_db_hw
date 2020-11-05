@@ -1,8 +1,6 @@
 package simpledb;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -76,6 +74,16 @@ public class TableStats {
      *            The cost per page of IO. This doesn't differentiate between
      *            sequential-scan IO and disk seeks.
      */
+
+    int ioCostPerPage;
+    int tupleNums;
+    int pageNums;
+    Object[] histogram; //这个表的每列的直方图数组
+    DbFile file;
+    TupleDesc tupleDesc;
+    DbFileIterator dbFileIterator;
+    int[][] minMax;
+
     public TableStats(int tableid, int ioCostPerPage) {
         // For this function, you'll have to get the
         // DbFile for the table in question,
@@ -85,6 +93,72 @@ public class TableStats {
         // necessarily have to (for example) do everything
         // in a single scan of the table.
         // some code goes here
+        this.ioCostPerPage = ioCostPerPage;
+        statsMap.put(Database.getCatalog().getTableName(tableid), this);
+        file = Database.getCatalog().getDatabaseFile(tableid);
+        tupleDesc = file.getTupleDesc();
+        histogram = new Object[tupleDesc.numFields()];
+        Set<PageId> pageIdSet = new HashSet<>(); //用来计算这个文件有多少个page
+
+        //遍历该表，求得每int型列的最大最小值和page个数、tuple个数
+        minMax = new int[tupleDesc.numFields()][2];
+        StringHistogram temp = new StringHistogram(1);
+        for(int i=0; i<minMax.length; i++){
+            if(tupleDesc.getFieldType(i) == Type.INT_TYPE){
+                minMax[i][0] = Integer.MAX_VALUE;
+                minMax[i][1] = Integer.MIN_VALUE;
+            }
+            else{
+                minMax[i][0] = temp.minVal();
+                minMax[i][1] = temp.maxVal();
+            }
+        }
+
+        dbFileIterator = file.iterator(new TransactionId());
+        try{
+            dbFileIterator.open();
+            while(dbFileIterator.hasNext()){
+                Tuple next = dbFileIterator.next();
+                tupleNums++;
+                pageIdSet.add(next.getRecordId().getPageId());
+                for(int i=0; i<tupleDesc.numFields(); i++){
+                    if(tupleDesc.getFieldType(i) == Type.INT_TYPE){
+                        IntField field = (IntField)next.getField(i);
+                        minMax[i][0] = Math.min(minMax[i][0], field.getValue());
+                        minMax[i][1] = Math.max(minMax[i][1], field.getValue());
+                    }
+                }
+            }
+        } catch (DbException | TransactionAbortedException e){
+            e.printStackTrace();
+        } finally {
+            dbFileIterator.close();
+        }
+        pageNums = pageIdSet.size();
+
+        //创建每列对应的直方图
+        for(int i=0; i<histogram.length; i++){
+            if(tupleDesc.getFieldType(i) == Type.INT_TYPE)
+                histogram[i] = new IntHistogram(NUM_HIST_BINS, minMax[i][0], minMax[i][1]);
+            else histogram[i] = new StringHistogram(NUM_HIST_BINS);
+        }
+
+        //再次遍历，插入每个元祖
+        try{
+            dbFileIterator.open();
+            while(dbFileIterator.hasNext()){
+                Tuple next = dbFileIterator.next();
+                for(int i=0; i<tupleDesc.numFields(); i++){
+                    if(tupleDesc.getFieldType(i) == Type.INT_TYPE)
+                        ((IntHistogram)histogram[i]).addValue(((IntField)next.getField(i)).getValue());
+                    else ((StringHistogram)histogram[i]).addValue(((StringField)next.getField(i)).getValue());
+                }
+            }
+        } catch (DbException | TransactionAbortedException e){
+            e.printStackTrace();
+        } finally {
+            dbFileIterator.close();
+        }
     }
 
     /**
@@ -101,7 +175,7 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // some code goes here
-        return 0;
+        return pageNums*ioCostPerPage;
     }
 
     /**
@@ -115,7 +189,7 @@ public class TableStats {
      */
     public int estimateTableCardinality(double selectivityFactor) {
         // some code goes here
-        return 0;
+        return (int)(selectivityFactor*totalTuples());
     }
 
     /**
@@ -130,7 +204,17 @@ public class TableStats {
      * */
     public double avgSelectivity(int field, Predicate.Op op) {
         // some code goes here
-        return 1.0;
+//        int width = minMax[field][1] - minMax[field][0] + 1;
+//        return switch (op) {
+//            case EQUALS -> 1.0 / width;
+//            case NOT_EQUALS -> 1 - 1.0 / width;
+//            case LESS_THAN, GREATER_THAN -> 1.0 * (width - 1) / 2;
+//            case LESS_THAN_OR_EQ, GREATER_THAN_OR_EQ -> 1.0 * (width + 1) / 2;
+//            default -> 0.0;
+//        };
+        if(tupleDesc.getFieldType(field) == Type.INT_TYPE)
+            return ((IntHistogram)histogram[field]).avgSelectivity();
+        return ((StringHistogram)histogram[field]).avgSelectivity();
     }
 
     /**
@@ -148,7 +232,9 @@ public class TableStats {
      */
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
         // some code goes here
-        return 1.0;
+        if(tupleDesc.getFieldType(field) == Type.INT_TYPE)
+            return ((IntHistogram)histogram[field]).estimateSelectivity(op, ((IntField)constant).getValue());
+        return ((StringHistogram)histogram[field]).estimateSelectivity(op, ((StringField)constant).getValue());
     }
 
     /**
@@ -156,7 +242,7 @@ public class TableStats {
      * */
     public int totalTuples() {
         // some code goes here
-        return 0;
+        return tupleNums;
     }
 
 }
