@@ -226,7 +226,6 @@ public class JoinOptimizer {
             HashMap<String, Double> filterSelectivities, boolean explain)
             throws ParsingException {
         //Not necessary for labs 1--3
-
         // some code goes here
         //Replace the following
         PlanCache planCache = new PlanCache();
