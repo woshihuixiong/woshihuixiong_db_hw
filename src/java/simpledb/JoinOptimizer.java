@@ -1,5 +1,6 @@
 package simpledb;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 import javax.swing.*;
@@ -228,6 +229,25 @@ public class JoinOptimizer {
 
         // some code goes here
         //Replace the following
+        PlanCache planCache = new PlanCache();
+        int j = joins.size();
+        for(int i=1; i<=j; i++){
+            Set<Set<LogicalJoinNode>> subsets = enumerateSubsets(joins, i);
+            for(Set<LogicalJoinNode> s : subsets){
+                double bestCostSoFar = Double.MAX_VALUE;
+                CostCard costCard = null;
+                for(LogicalJoinNode s_ : s){
+                    CostCard tempCard = computeCostAndCardOfSubplan(stats, filterSelectivities, s_, s, bestCostSoFar, planCache);
+                    if(tempCard != null){
+                        costCard = tempCard;
+                        bestCostSoFar = costCard.cost;
+                    }
+                }
+                if(i==joins.size() && costCard!=null) joins = costCard.plan;
+                if(costCard != null) planCache.addPlan(s,costCard.cost, costCard.card, costCard.plan);
+            }
+        }
+        if(explain) printJoins(joins, planCache, stats, filterSelectivities);
         return joins;
     }
 
