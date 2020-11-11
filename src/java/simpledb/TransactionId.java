@@ -1,6 +1,7 @@
 package simpledb;
 
 import java.io.Serializable;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -12,10 +13,22 @@ public class TransactionId implements Serializable {
 
     static AtomicLong counter = new AtomicLong(0);
     final long myid;
+    long beginTime;
 
     public TransactionId() {
-        myid = counter.getAndIncrement();
+    	myid = counter.getAndIncrement();
+		/*
+		 * 如果每个线程超时时间设置一样，
+		 * 那么两个同时开启的会造成死锁的线程也会同时超时然后同时abort，
+		 * 然后就会再次同时开启，一直死锁
+		 * 加入一个随机数相当于把时间限制设置的不一样
+		*/
+    	beginTime = System.currentTimeMillis() + new Random().nextInt(100);
     }
+
+    public void resetBeginTime(){
+    	beginTime = System.currentTimeMillis() + new Random().nextInt(2000);
+	}
 
     public long getId() {
         return myid;
