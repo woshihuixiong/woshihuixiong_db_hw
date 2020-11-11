@@ -108,6 +108,8 @@ public class TransactionHelp {
         return System.currentTimeMillis() - tid.beginTime >= Transaction_Limit_Time;
     }
 
+    // 当比如说两个事务之间出现死锁时，将其中一个事务直接reset（所有操作也直接abort），重新建立一个事务，再抛出一个异常
+    // 个人感觉应该不会出现脏读等问题，因为每个事务进行读或写操作时必须先持有唯一的排他锁writeLock
     private void dealWithPotentialDeadlocks(TransactionId tid) throws TransactionAbortedException{
         try {
             Database.getBufferPool().transactionComplete(tid, false);
